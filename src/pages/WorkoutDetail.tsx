@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useDataVersion } from '../context/DataVersion'
-import { format, parseISO } from 'date-fns'
+import { format, parseISO } from '../utils/date'
 import { fetchAllWorkouts, fetchWorkout, updateWorkout } from '../api/dataSource'
 import type { Workout, WorkoutSet } from '../types/workout'
 import {
@@ -17,7 +17,6 @@ import MusclePill from '../components/MusclePill'
 import { FullPageSpinner } from '../components/Spinner'
 import ErrorBanner from '../components/ErrorBanner'
 import AppTooltip from '../components/Tooltip'
-import clsx from 'clsx'
 
 interface PersonalRecord {
   exerciseTitle: string
@@ -391,7 +390,7 @@ export default function WorkoutDetail() {
                     {exercise.sets.map((set) => (
                       <tr
                         key={set.index}
-                        className={clsx(set.type === 'warmup' && 'opacity-50')}
+                        className={set.type === 'warmup' ? 'opacity-50' : undefined}
                         style={{ borderBottom: '1px solid #1e1e1e' }}
                       >
                         <td className="py-2 pr-4 text-white">{set.index + 1}</td>

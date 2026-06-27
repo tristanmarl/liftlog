@@ -13,7 +13,7 @@ import {
   addMonths,
   subMonths,
   isToday,
-} from 'date-fns'
+} from '../utils/date'
 import { fetchAllWorkouts } from '../api/dataSource'
 import type { Workout } from '../types/workout'
 import {

@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useDataVersion } from '../context/DataVersion'
-import { format, parseISO } from 'date-fns'
+import { format, parseISO } from '../utils/date'
 import { DATA_SOURCE_LABELS, fetchAllWorkouts } from '../api/dataSource'
 import type { Workout } from '../types/workout'
 import {

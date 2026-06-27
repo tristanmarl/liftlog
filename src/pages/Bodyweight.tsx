@@ -1,21 +1,12 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useDataVersion } from '../context/DataVersion'
-import { format, parseISO, subDays, differenceInDays } from 'date-fns'
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  ReferenceLine,
-} from 'recharts'
+import { format, parseISO, subDays, differenceInDays } from '../utils/date'
 import { DATA_SOURCE_LABELS, fetchBodyweightEntries } from '../api/dataSource'
 import type { BodyweightEntry } from '../types/workout'
 import StatCard from '../components/StatCard'
 import { FullPageSpinner } from '../components/Spinner'
 import ErrorBanner from '../components/ErrorBanner'
+import SimpleChart from '../components/SimpleChart'
 
 type Unit = 'kg' | 'lbs'
 
@@ -204,54 +195,15 @@ export default function Bodyweight() {
             No data in this range
           </div>
         ) : (
-          <ResponsiveContainer width="100%" height={280}>
-            <LineChart data={chartData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" vertical={false} />
-              <XAxis
-                dataKey="date"
-                tick={{ fill: '#666', fontSize: 11 }}
-                axisLine={false}
-                tickLine={false}
-                tickFormatter={(d) => format(parseISO(d), 'MMM d')}
-                interval="preserveStartEnd"
-              />
-              <YAxis
-                domain={[yMin, yMax]}
-                tick={{ fill: '#666', fontSize: 11 }}
-                axisLine={false}
-                tickLine={false}
-                unit={` ${unit}`}
-              />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: '#252525',
-                  border: '1px solid #333',
-                  borderRadius: '8px',
-                  color: '#fff',
-                }}
-                labelFormatter={(d) => format(parseISO(String(d)), 'MMMM d, yyyy')}
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                formatter={(v: any) => [`${v} ${unit}`, 'Weight']}
-              />
-              {avgWeight !== null && (
-                <ReferenceLine
-                  y={avgWeight}
-                  stroke="#444"
-                  strokeDasharray="4 4"
-                  label={{ value: `avg ${avgWeight}`, fill: '#555', fontSize: 10 }}
-                />
-              )}
-              <Line
-                type="monotone"
-                dataKey="weight"
-                stroke="#e86a2e"
-                strokeWidth={2}
-                dot={chartData.length <= 60 ? { fill: '#e86a2e', r: 3 } : false}
-                activeDot={{ r: 5, fill: '#e86a2e' }}
-                name={`Weight (${unit})`}
-              />
-            </LineChart>
-          </ResponsiveContainer>
+          <SimpleChart
+            data={chartData.map((point) => ({ label: point.date, value: point.weight }))}
+            height={280}
+            yMin={yMin}
+            yMax={yMax}
+            average={avgWeight}
+            formatLabel={(date) => format(parseISO(date), 'MMM d')}
+            formatValue={(value) => `${Math.round(value * 10) / 10} ${unit}`}
+          />
         )}
       </div>
 

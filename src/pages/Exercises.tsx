@@ -1,18 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useDataVersion } from '../context/DataVersion'
-import { format, parseISO, subDays } from 'date-fns'
-import {
-  LineChart,
-  Line,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-} from 'recharts'
+import { format, parseISO, subDays } from '../utils/date'
 import { fetchAllWorkouts } from '../api/dataSource'
 import type { Workout } from '../types/workout'
 import { getExerciseHistory, formatVolume, estimateOneRepMax, detectPlateau } from '../utils/stats'
@@ -21,6 +10,7 @@ import MusclePill from '../components/MusclePill'
 import { FullPageSpinner } from '../components/Spinner'
 import ErrorBanner from '../components/ErrorBanner'
 import AppTooltip from '../components/Tooltip'
+import SimpleChart from '../components/SimpleChart'
 
 interface ExerciseSummary {
   title: string
@@ -351,42 +341,12 @@ export default function Exercises() {
               style={{ backgroundColor: '#1a1a1a', border: '1px solid #2a2a2a' }}
             >
               <h3 className="text-sm font-semibold text-white mb-3">Max weight over time</h3>
-              <ResponsiveContainer width="100%" height={160}>
-                <LineChart data={selectedHistory} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" vertical={false} />
-                  <XAxis
-                    dataKey="date"
-                    tick={{ fill: '#555', fontSize: 10 }}
-                    axisLine={false}
-                    tickLine={false}
-                    tickFormatter={(d) => format(parseISO(d), 'MMM d')}
-                  />
-                  <YAxis
-                    tick={{ fill: '#555', fontSize: 10 }}
-                    axisLine={false}
-                    tickLine={false}
-                    unit=" kg"
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: '#252525',
-                      border: '1px solid #333',
-                      borderRadius: '8px',
-                      color: '#fff',
-                      fontSize: 12,
-                    }}
-                    labelFormatter={(d) => format(parseISO(String(d)), 'MMM d, yyyy')}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="maxWeightKg"
-                    stroke="#e86a2e"
-                    strokeWidth={2}
-                    dot={{ fill: '#e86a2e', r: 3 }}
-                    name="Max Weight (kg)"
-                  />
-                </LineChart>
-              </ResponsiveContainer>
+              <SimpleChart
+                data={selectedHistory.map((point) => ({ label: point.date, value: point.maxWeightKg }))}
+                height={160}
+                formatLabel={(date) => format(parseISO(date), 'MMM d')}
+                formatValue={(value) => `${Math.round(value)} kg`}
+              />
             </div>
 
             {/* Volume chart */}
@@ -395,37 +355,13 @@ export default function Exercises() {
               style={{ backgroundColor: '#1a1a1a', border: '1px solid #2a2a2a' }}
             >
               <h3 className="text-sm font-semibold text-white mb-3">Total volume per session</h3>
-              <ResponsiveContainer width="100%" height={160}>
-                <BarChart data={selectedHistory} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" vertical={false} />
-                  <XAxis
-                    dataKey="date"
-                    tick={{ fill: '#555', fontSize: 10 }}
-                    axisLine={false}
-                    tickLine={false}
-                    tickFormatter={(d) => format(parseISO(d), 'MMM d')}
-                  />
-                  <YAxis
-                    tick={{ fill: '#555', fontSize: 10 }}
-                    axisLine={false}
-                    tickLine={false}
-                    tickFormatter={(v: number) => formatVolume(v).replace(' kg', '')}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: '#252525',
-                      border: '1px solid #333',
-                      borderRadius: '8px',
-                      color: '#fff',
-                      fontSize: 12,
-                    }}
-                    labelFormatter={(d) => format(parseISO(String(d)), 'MMM d, yyyy')}
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    formatter={(v: any) => [`${formatVolume(Number(v))}`, 'Volume']}
-                  />
-                  <Bar dataKey="totalVolumeKg" fill="#e86a2e" radius={[3, 3, 0, 0]} name="Volume (kg)" />
-                </BarChart>
-              </ResponsiveContainer>
+              <SimpleChart
+                data={selectedHistory.map((point) => ({ label: point.date, value: point.totalVolumeKg }))}
+                kind="bar"
+                height={160}
+                formatLabel={(date) => format(parseISO(date), 'MMM d')}
+                formatValue={formatVolume}
+              />
             </div>
           </div>
         )}

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { format, parseISO } from 'date-fns'
+import { format, parseISO } from '../utils/date'
 import type { Workout } from '../types/workout'
 import { getMuscleGroupsForExercise } from '../utils/muscles'
 import MusclePill from './MusclePill'

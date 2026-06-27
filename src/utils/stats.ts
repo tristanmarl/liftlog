@@ -8,7 +8,7 @@ import {
   isWithinInterval,
   differenceInMinutes,
   differenceInDays,
-} from 'date-fns'
+} from './date'
 import type { Workout, WorkoutSet } from '../types/workout'
 import { getMuscleGroupsForExercise } from './muscles'
 
@@ -94,33 +94,6 @@ export function getWeeklyStats(workouts: Workout[], weeksBack = 0): WeeklyStats 
     durationMinutes,
     muscleGroups: Array.from(muscleGroupSet),
   }
-}
-
-export function getWeeklyWorkoutCounts(
-  workouts: Workout[],
-  weeksBack = 12,
-): { weekLabel: string; count: number; volumeKg: number }[] {
-  return Array.from({ length: weeksBack }, (_, i) => {
-    const offset = weeksBack - 1 - i
-    const referenceDate = subWeeks(new Date(), offset)
-    const weekStart = startOfWeek(referenceDate, { weekStartsOn: 1 })
-    const weekEnd = endOfWeek(referenceDate, { weekStartsOn: 1 })
-
-    const weekWorkouts = workouts.filter((w) =>
-      isWithinInterval(parseISO(w.start_time), { start: weekStart, end: weekEnd }),
-    )
-
-    const volumeKg = weekWorkouts.reduce(
-      (sum, w) => sum + computeWorkoutVolume(w),
-      0,
-    )
-
-    return {
-      weekLabel: format(weekStart, 'MMM d'),
-      count: weekWorkouts.length,
-      volumeKg,
-    }
-  })
 }
 
 export function getExerciseHistory(
@@ -334,43 +307,6 @@ export function getPRsInPeriod(workouts: Workout[], days: number): PREntry[] {
   return prs.reverse()
 }
 
-export type WorkoutSplit = 'Full Body' | 'Upper / Lower' | 'Push / Pull / Legs' | 'Bro Split' | 'Unknown'
-
-export function detectWorkoutSplit(workouts: Workout[]): WorkoutSplit {
-  const recent = workouts.slice(0, 12)
-  if (recent.length < 4) return 'Unknown'
-
-  const sessionMuscles = recent.map((w) => {
-    const muscles = new Set<string>()
-    for (const e of w.exercises) {
-      getMuscleGroupsForExercise(e.title, e.muscle_groups).forEach((m) => {
-        if (m !== 'other') muscles.add(m)
-      })
-    }
-    return muscles
-  })
-
-  const fullBodyCount = sessionMuscles.filter((s) => s.size >= 4).length
-  if (fullBodyCount >= recent.length * 0.6) return 'Full Body'
-
-  const isUpper = (m: Set<string>) => m.has('chest') || m.has('shoulders') || m.has('biceps') || m.has('triceps') || m.has('back')
-  const isLower = (m: Set<string>) => m.has('legs')
-  const upperCount = sessionMuscles.filter((m) => isUpper(m) && !isLower(m)).length
-  const lowerCount = sessionMuscles.filter((m) => isLower(m) && !isUpper(m)).length
-  if (upperCount >= 2 && lowerCount >= 2 && Math.abs(upperCount - lowerCount) <= 2) return 'Upper / Lower'
-
-  const isPush = (m: Set<string>) => (m.has('chest') || m.has('shoulders')) && !m.has('back') && !m.has('biceps')
-  const isPull = (m: Set<string>) => (m.has('back') || m.has('biceps')) && !m.has('chest')
-  const pushCount = sessionMuscles.filter(isPush).length
-  const pullCount = sessionMuscles.filter(isPull).length
-  if (pushCount >= 2 && pullCount >= 2 && lowerCount >= 2) return 'Push / Pull / Legs'
-
-  const broCount = sessionMuscles.filter((s) => s.size <= 2).length
-  if (broCount >= recent.length * 0.5) return 'Bro Split'
-
-  return 'Unknown'
-}
-
 // Consecutive weeks with ≥1 workout (most recent streak)
 export function getConsistencyStreak(workouts: Workout[]): number {
   if (workouts.length === 0) return 0
@@ -477,11 +413,6 @@ export function getMuscleBalance(workouts: Workout[], weeks = 4): MuscleBalance 
   return { pushSets, pullSets, upperSets, lowerSets, pushPullRatio, upperLowerRatio, warning }
 }
 
-export interface TrainSuggestion {
-  muscles: string[]
-  reason: string
-}
-
 export const ROUTINE_ORDER = ['Upper #1', 'Lower #1', 'Upper #2', 'Lower #2'] as const
 
 export interface NextRoutineWorkout {
@@ -585,56 +516,6 @@ export function getNextRoutineWorkout(workouts: Workout[]): NextRoutineWorkout {
   }
 }
 
-export function getTrainTodaySuggestion(workouts: Workout[]): TrainSuggestion | null {
-  if (workouts.length === 0) return { muscles: ['full body'], reason: 'Start with a full body workout to build your foundation.' }
-
-  // Get last trained date per muscle
-  const lastWorked = new Map<string, string>()
-  for (const workout of workouts) {
-    const date = format(parseISO(workout.start_time), 'yyyy-MM-dd')
-    for (const exercise of workout.exercises) {
-      const muscles = getMuscleGroupsForExercise(exercise.title, exercise.muscle_groups)
-      for (const m of muscles) {
-        if (m === 'other' || m === 'cardio') continue
-        const existing = lastWorked.get(m)
-        if (!existing || date > existing) lastWorked.set(m, date)
-      }
-    }
-  }
-
-  // Find muscles not trained in 2+ days
-  const today = format(new Date(), 'yyyy-MM-dd')
-  const rested: { muscle: string; days: number }[] = []
-  for (const [muscle, lastDate] of lastWorked.entries()) {
-    const days = differenceInDays(parseISO(today), parseISO(lastDate))
-    if (days >= 2) rested.push({ muscle, days })
-  }
-
-  if (rested.length === 0) {
-    return { muscles: ['rest'], reason: 'All muscle groups were trained recently. Consider a rest or active recovery day.' }
-  }
-
-  // Most rested muscles (prioritise legs, back as commonly skipped)
-  rested.sort((a, b) => b.days - a.days)
-  const priorityOrder = ['legs', 'back', 'chest', 'shoulders', 'biceps', 'triceps', 'core']
-  const topMuscles = rested
-    .sort((a, b) => {
-      const pa = priorityOrder.indexOf(a.muscle)
-      const pb = priorityOrder.indexOf(b.muscle)
-      const priorityDiff = (pa === -1 ? 99 : pa) - (pb === -1 ? 99 : pb)
-      if (priorityDiff !== 0) return priorityDiff
-      return b.days - a.days
-    })
-    .slice(0, 2)
-    .map((r) => r.muscle)
-
-  const daysText = rested[0].days === 1 ? 'yesterday' : `${rested[0].days} days ago`
-  return {
-    muscles: topMuscles,
-    reason: `${topMuscles.map(m => m.charAt(0).toUpperCase() + m.slice(1)).join(' & ')} last trained ${daysText}. Ready to train again.`,
-  }
-}
-
 // Returns number of consecutive training days ending today/yesterday (overtraining check)
 export function getConsecutiveTrainingDays(workouts: Workout[]): number {
   if (workouts.length === 0) return 0
@@ -653,117 +534,12 @@ export function getConsecutiveTrainingDays(workouts: Workout[]): number {
   return count
 }
 
-export interface Milestone {
-  id: string
-  label: string
-  description: string
-  achieved: boolean
-  achievedDate?: string
-}
-
-export function getMilestones(workouts: Workout[]): Milestone[] {
-  const total = workouts.length
-  const streak = getConsistencyStreak(workouts)
-  const hasPR = workouts.some((w) =>
-    w.exercises.some((e) => e.sets.some((s) => s.weight_kg != null && s.weight_kg > 0))
-  )
-
-  // Sort workouts ascending for date-based milestones
-  const sorted = [...workouts].sort((a, b) => parseISO(a.start_time).getTime() - parseISO(b.start_time).getTime())
-
-  const nthWorkoutDate = (n: number) =>
-    sorted.length >= n ? format(parseISO(sorted[n - 1].start_time), 'MMM d, yyyy') : undefined
-
-  return [
-    { id: 'first', label: 'First Workout', description: 'Completed your first workout', achieved: total >= 1, achievedDate: nthWorkoutDate(1) },
-    { id: 'w10', label: '10 Workouts', description: 'Completed 10 workouts', achieved: total >= 10, achievedDate: nthWorkoutDate(10) },
-    { id: 'w25', label: '25 Workouts', description: 'Completed 25 workouts', achieved: total >= 25, achievedDate: nthWorkoutDate(25) },
-    { id: 'w50', label: '50 Workouts', description: 'Completed 50 workouts', achieved: total >= 50, achievedDate: nthWorkoutDate(50) },
-    { id: 'w100', label: '100 Workouts', description: 'Completed 100 workouts', achieved: total >= 100, achievedDate: nthWorkoutDate(100) },
-    { id: 'w200', label: '200 Workouts', description: 'Completed 200 workouts', achieved: total >= 200, achievedDate: nthWorkoutDate(200) },
-    { id: 'firstpr', label: 'First PR', description: 'Set your first personal record', achieved: hasPR },
-    { id: 's4', label: '4-Week Streak', description: 'Trained every week for 4 weeks in a row', achieved: streak >= 4 },
-    { id: 's8', label: '8-Week Streak', description: 'Trained every week for 8 weeks in a row', achieved: streak >= 8 },
-    { id: 's12', label: '3-Month Streak', description: 'Trained every week for 12 weeks in a row', achieved: streak >= 12 },
-    { id: 's26', label: '6-Month Streak', description: 'Trained every week for 26 weeks in a row', achieved: streak >= 26 },
-    { id: 's52', label: '1-Year Streak', description: 'Trained every week for a full year', achieved: streak >= 52 },
-  ]
-}
-
-export function getPeriodBarData(
-  workouts: Workout[],
-  days: number,
-  buckets: number,
-): { label: string; count: number; volumeKg: number }[] {
-  return Array.from({ length: buckets }, (_, i) => {
-    const offset = buckets - 1 - i
-    const now = new Date()
-    const end = new Date(now.getTime() - offset * days * 24 * 60 * 60 * 1000)
-    const start = new Date(end.getTime() - days * 24 * 60 * 60 * 1000)
-
-    const periodWorkouts = workouts.filter((w) => {
-      const t = parseISO(w.start_time).getTime()
-      return t >= start.getTime() && t < end.getTime()
-    })
-
-    return {
-      label: format(start, days <= 1 ? 'MMM d' : days <= 7 ? 'MMM d' : 'MMM d'),
-      count: periodWorkouts.length,
-      volumeKg: periodWorkouts.reduce((sum, w) => sum + computeWorkoutVolume(w), 0),
-    }
-  })
-}
-
 export interface ProgressionSuggestion {
   exerciseTitle: string
   lastWeightKg: number
   suggestedWeightKg: number
   isPlateaued: boolean
   lastDate: string
-}
-
-// For exercises done in the last 14 days, suggest next session weight based on progressive overload.
-export function getProgressionSuggestions(workouts: Workout[], maxCount = 4): ProgressionSuggestion[] {
-  const cutoff = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000)
-  // workouts arrive sorted desc (most recent first)
-  const recentWorkouts = workouts.filter((w) => parseISO(w.start_time) >= cutoff)
-
-  const seen = new Set<string>()
-  const suggestions: ProgressionSuggestion[] = []
-
-  for (const workout of recentWorkouts) {
-    for (const exercise of workout.exercises) {
-      if (seen.has(exercise.title)) continue
-      seen.add(exercise.title)
-
-      const normalSets = exercise.sets.filter(
-        (s) => s.type !== 'warmup' && s.weight_kg != null && s.weight_kg > 0,
-      )
-      if (normalSets.length === 0) continue
-
-      const lastWeight = Math.max(...normalSets.map((s) => s.weight_kg as number))
-      const history = getExerciseHistory(workouts, exercise.title)
-      const plateaued = detectPlateau(history, 3)
-
-      const increment = lastWeight >= 60 ? 2.5 : 1.25
-      const suggestedWeightKg = plateaued
-        ? lastWeight
-        : Math.round((lastWeight + increment) * 4) / 4
-
-      suggestions.push({
-        exerciseTitle: exercise.title,
-        lastWeightKg: lastWeight,
-        suggestedWeightKg,
-        isPlateaued: plateaued,
-        lastDate: format(parseISO(workout.start_time), 'yyyy-MM-dd'),
-      })
-
-      if (suggestions.length >= maxCount) break
-    }
-    if (suggestions.length >= maxCount) break
-  }
-
-  return suggestions
 }
 
 export function getProgressionSuggestionsForRoutineWorkout(

@@ -3,8 +3,6 @@ import type {
   WorkoutExercise,
   WorkoutSet,
   WorkoutsResponse,
-  ExerciseTemplate,
-  ExerciseTemplatesResponse,
   BodyweightEntry,
   BodyweightResponse,
 } from '../types/hevy'
@@ -13,7 +11,7 @@ const BASE_URL = 'https://api.hevyapp.com'
 const PAGE_SIZE = 10
 
 // Keys persisted to sessionStorage so data survives page reloads within the same tab.
-const SESSION_KEYS = new Set(['__all_workouts__', '__all_bodyweights__', '__all_exercise_templates__'])
+const SESSION_KEYS = new Set(['__all_workouts__', '__all_bodyweights__'])
 const SESSION_PREFIX = 'hevylog:'
 
 interface CacheEntry<T> {
@@ -217,21 +215,6 @@ export async function fetchBodyweightEntries(): Promise<BodyweightEntry[]> {
 
   setCached(cacheKey, entries)
   return entries
-}
-
-export async function fetchExerciseTemplates(): Promise<ExerciseTemplate[]> {
-  const cacheKey = '__all_exercise_templates__'
-  const cached = getCached<ExerciseTemplate[]>(cacheKey)
-  if (cached !== null) return cached
-
-  const templates = await fetchAllPages<ExerciseTemplate>(
-    '/v1/exercise_templates',
-    (data) => (data as ExerciseTemplatesResponse).exercise_templates ?? [],
-    (data) => (data as ExerciseTemplatesResponse).page_count ?? 1,
-  )
-
-  setCached(cacheKey, templates)
-  return templates
 }
 
 export function clearCache(): void {

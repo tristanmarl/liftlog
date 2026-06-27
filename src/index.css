@@ -63,8 +63,3 @@ a {
 ::-webkit-scrollbar-thumb:hover {
   background: #444;
 }
-
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to   { transform: rotate(360deg); }
-}

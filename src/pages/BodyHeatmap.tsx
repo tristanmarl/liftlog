@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useDataVersion } from '../context/DataVersion'
-import { format, parseISO, differenceInDays } from 'date-fns'
+import { format, parseISO, differenceInDays } from '../utils/date'
 import { fetchAllWorkouts } from '../api/dataSource'
 import type { MuscleGroupStats, Workout } from '../types/workout'
 import { computeMuscleHeatmapForPeriod } from '../utils/muscles'

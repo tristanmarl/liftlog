@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
-import clsx from 'clsx'
 import { DATA_SOURCE_LABELS, fetchAllWorkouts, getLastFetchTime, type DataSource } from '../api/dataSource'
 import type { Workout } from '../types/workout'
 import GlobalSearch from './GlobalSearch'
@@ -103,6 +102,10 @@ function formatMinutesAgo(date: Date): string {
   return `${mins} min ago`
 }
 
+function cx(...classes: Array<string | false | null | undefined>): string {
+  return classes.filter(Boolean).join(' ')
+}
+
 export default function Layout() {
   const { source, setSource, version, refresh } = useDataVersion()
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -171,7 +174,7 @@ export default function Layout() {
 
       {/* Sidebar */}
       <aside
-        className={clsx(
+        className={cx(
           'fixed left-0 top-0 z-30 h-full w-60 flex flex-col transition-transform duration-300 lg:translate-x-0 lg:static lg:z-auto',
           sidebarOpen ? 'translate-x-0' : '-translate-x-full',
         )}
@@ -198,7 +201,7 @@ export default function Layout() {
               to={to}
               onClick={() => setSidebarOpen(false)}
               className={({ isActive }) =>
-                clsx(
+                cx(
                   'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
                   isActive
                     ? 'text-white border-l-2 pl-[10px]'
@@ -267,7 +270,7 @@ export default function Layout() {
             <svg
               width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
               strokeLinecap="round" strokeLinejoin="round"
-              style={{ flexShrink: 0, animation: refreshing ? 'spin 0.8s linear infinite' : undefined }}
+              className={cx('shrink-0', refreshing && 'animate-spin')}
             >
               <polyline points="23 4 23 10 17 10" />
               <polyline points="1 20 1 14 7 14" />
